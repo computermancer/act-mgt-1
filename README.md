@@ -1,46 +1,136 @@
-# Getting Started with Create React App
+# Activities Management App (AMA)
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A compassionate event manager app designed to encourage users to explore and adapt activities, evolving their planning habits.
+
+## Features
+
+- **User Authentication**: Secure sign-up and login
+- **Activities Management**: Create, read, update, and delete activities
+- **Calendar View**: Visualize scheduled activities
+- **Reminders**: Set up reminders for activities
+- **Notes**: Keep general notes unrelated to specific activities
+- **Mobile-First Design**: Optimized for iPhone and other mobile devices
+
+## Tech Stack
+
+- **Frontend**: React with TypeScript
+- **Styling**: Tailwind CSS
+- **State Management**: React Context API
+- **Routing**: React Router
+- **UI Components**: Headless UI, Hero Icons
+- **Date/Time**: date-fns, react-datepicker
+- **Calendar**: react-big-calendar
+- **Backend**: Supabase (Authentication + Database)
+- **Notifications**: Twilio (for SMS reminders)
+
+## Prerequisites
+
+- Node.js (v14 or later)
+- npm or yarn
+- Supabase account
+- Twilio account (for SMS reminders)
+
+## Getting Started
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd activities-management-app
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
+
+3. **Set up environment variables**
+   - Copy `.env.example` to `.env`
+   - Fill in your Supabase and Twilio credentials
+   ```bash
+   cp .env.example .env
+   ```
+
+4. **Start the development server**
+   ```bash
+   npm start
+   # or
+   yarn start
+   ```
+   The app will be available at [http://localhost:3000](http://localhost:3000)
+
+## Project Structure
+
+```
+src/
+├── components/         # Reusable UI components
+│   └── activities/     # Activity-related components
+├── context/            # React context providers
+├── pages/              # Page components
+├── services/           # API and service integrations
+├── types/              # TypeScript type definitions
+└── utils/              # Utility functions
+```
 
 ## Available Scripts
 
-In the project directory, you can run:
+- `npm start` - Start the development server
+- `npm test` - Run tests
+- `npm run build` - Build for production
+- `npm run eject` - Eject from Create React App (not recommended)
 
-### `npm start`
+## Environment Variables
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+Create a `.env` file in the root directory with the following variables:
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+```
+# Supabase
+REACT_APP_SUPABASE_URL=your_supabase_url_here
+REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 
-### `npm test`
+# Twilio (for SMS reminders)
+REACT_APP_TWILIO_ACCOUNT_SID=your_twilio_account_sid_here
+REACT_APP_TWILIO_AUTH_TOKEN=your_twilio_auth_token_here
+REACT_APP_TWILIO_PHONE_NUMBER=your_twilio_phone_number_here
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Deployment
 
-### `npm run build`
+### Building for Production
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```bash
+npm run build
+# or
+yarn build
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+This will create a `build` directory with the production build of your app.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Deploying to Netlify
 
-### `npm run eject`
+1. Push your code to a Git repository
+2. Connect the repository to Netlify
+3. Set up the build command: `npm run build`
+4. Set the publish directory: `build`
+5. Add the environment variables from your `.env` file to Netlify
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+## Contributing
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+## License
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Learn More
+## Acknowledgments
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
+- [Create React App](https://create-react-app.dev/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [Supabase](https://supabase.com/)
+- [Twilio](https://www.twilio.com/)
+- [React Icons](https://react-icons.github.io/react-icons/)

@@ -1,26 +1,34 @@
 import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+import { Routes, Route } from 'react-router-dom';
+import ActivitiesPage from './pages/ActivitiesPage';
+import CalendarPage from './pages/CalendarPage';
+import NotesPage from './pages/NotesPage';
+import Layout from './components/Layout';
+import { TestConnection } from './components/TestConnection';
 
-function App() {
+// App Routes Component
+const AppRoutes = () => {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <Routes>
+      <Route path="/" element={<CalendarPage />} />
+      <Route path="/activities" element={<ActivitiesPage />} />
+      <Route path="/calendar" element={<CalendarPage />} />
+      <Route path="/notes" element={<NotesPage />} />
+      <Route path="*" element={<div>Page not found</div>} />
+    </Routes>
   );
-}
+};
+
+// Main App Component
+const App = () => {
+  return (
+    <>
+      <TestConnection />
+      <Layout>
+        <AppRoutes />
+      </Layout>
+    </>
+  );
+};
 
 export default App;
