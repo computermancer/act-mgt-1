@@ -1,5 +1,6 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
+import { Analytics } from "@vercel/analytics/react";
 import ActivitiesPage from './pages/ActivitiesPage';
 import CalendarPage from './pages/CalendarPage';
 import NotesPage from './pages/NotesPage';
@@ -27,6 +28,7 @@ const App = () => {
       <Layout>
         <AppRoutes />
       </Layout>
+      <Analytics />
     </>
   );
 };

@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Note, getNotes, createNote, updateNote, deleteNote } from '../services/noteService';
+import NoteComments from '../components/notes/NoteComments';
+import NoteEmoticonMenu from '../components/notes/NoteEmoticonMenu';
+import NoteEmojiDisplay from '../components/notes/NoteEmojiDisplay';
 
 const NotesPage: React.FC = () => {
   const [notes, setNotes] = useState<Note[]>([]);
+  const [currentNote, setCurrentNote] = useState<Note | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
-  const [currentNote, setCurrentNote] = useState<Note | null>(null);
-  const [noteToDelete, setNoteToDelete] = useState<{id: string, title: string} | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [noteToDelete, setNoteToDelete] = useState<Note | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,62 +42,49 @@ const NotesPage: React.FC = () => {
   };
 
   const handleEditNote = (note: Note) => {
-    setCurrentNote(note);
     setTitle(note.title);
-    setContent(note.content);
+    setContent(note.content || '');
     setIsModalOpen(true);
   };
 
-  const handleDeleteClick = (note: Note, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setNoteToDelete({ id: note.id, title: note.title });
-  };
-
-  const confirmDeleteNote = async () => {
-    if (!noteToDelete) return;
-    
-    try {
-      await deleteNote(noteToDelete.id);
-      setNotes(notes.filter(note => note.id !== noteToDelete.id));
-      setNoteToDelete(null);
-    } catch (err) {
-      console.error('Failed to delete note:', err);
-      setError('Failed to delete note. Please try again.');
-    }
-  };
-
-  const cancelDeleteNote = () => {
-    setNoteToDelete(null);
-  };
-
-  const handleSaveNote = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleSaveNote = async () => {
     if (!title.trim()) return;
 
     try {
       if (currentNote) {
         // Update existing note
         const updatedNote = await updateNote(currentNote.id, { title, content });
-        setNotes(notes.map(note => 
+        setNotes(prev => prev.map(note => 
           note.id === currentNote.id ? updatedNote : note
         ));
       } else {
-        // Add new note
+        // Create new note
         const newNote = await createNote({ title, content });
-        setNotes([newNote, ...notes]);
+        setNotes(prev => [newNote, ...prev]);
       }
-
-      // Reset form and close modal
+      setIsModalOpen(false);
       setTitle('');
       setContent('');
-      setIsModalOpen(false);
-      setCurrentNote(null);
-      setError(null);
     } catch (err) {
       console.error('Failed to save note:', err);
-      setError(`Failed to ${currentNote ? 'update' : 'create'} note. Please try again.`);
     }
+  };
+
+  const handleDeleteClick = (note: Note, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setNoteToDelete(note);
+  };
+
+  const confirmDeleteNote = async () => {
+    if (noteToDelete) {
+      await deleteNote(noteToDelete.id);
+      setNotes(prev => prev.filter(n => n.id !== noteToDelete.id));
+      setNoteToDelete(null);
+    }
+  };
+
+  const cancelDeleteNote = () => {
+    setNoteToDelete(null);
   };
 
   const handleViewNote = (note: Note) => {
@@ -105,17 +95,6 @@ const NotesPage: React.FC = () => {
   const closeViewer = () => {
     setIsViewerOpen(false);
     setCurrentNote(null);
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
   };
 
   return (
@@ -196,12 +175,21 @@ const NotesPage: React.FC = () => {
               {notes.map((note) => (
                 <div 
                   key={note.id} 
-                  className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200 cursor-pointer flex flex-col"
-                  onClick={() => handleViewNote(note)}
+                  className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200"
                 >
-                  <div className="p-5 flex-1 flex flex-col">
+                  <div 
+                    className="p-5 cursor-pointer"
+                    onClick={() => handleViewNote(note)}
+                  >
                     <div className="flex justify-between items-start">
-                      <h3 className="text-lg font-medium text-gray-900 truncate">{note.title}</h3>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-medium text-gray-900">{note.title}</h3>
+                        <div className="mt-2">
+                          <p className="text-gray-500 text-sm line-clamp-3">
+                            {note.content || <span className="text-gray-400 italic">No content</span>}
+                          </p>
+                        </div>
+                      </div>
                       <div className="flex space-x-2">
                         <button
                           type="button"
@@ -224,11 +212,25 @@ const NotesPage: React.FC = () => {
                         </button>
                       </div>
                     </div>
-                    <div className="mt-2 flex-1 overflow-hidden">
-                      <p className="text-gray-500 text-sm line-clamp-4">
-                        {note.content || <span className="text-gray-400 italic">No content</span>}
-                      </p>
-                    </div>
+                  </div>
+                  <div 
+                    className="px-5 py-2 bg-gray-50 border-t border-gray-100 flex justify-between items-center"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <NoteEmojiDisplay noteId={note.id} className="text-lg" />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrentNote(note);
+                      }}
+                      className="text-sm text-gray-500 hover:text-blue-500 flex items-center"
+                    >
+                      <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                      Comments
+                    </button>
                   </div>
                 </div>
               ))}
@@ -300,9 +302,9 @@ const NotesPage: React.FC = () => {
               &#8203;
             </span>
 
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
-              <div className="bg-white px-6 py-5 sm:p-6">
-                <div className="flex justify-between items-center mb-4">
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle w-[90vw] max-w-4xl max-h-[90vh] flex flex-col">
+              <div className="bg-white px-6 py-5 sm:p-6 flex-1 overflow-y-auto">
+                <div className="flex justify-between items-start mb-4">
                   <h3 className="text-xl font-semibold text-gray-900">{currentNote.title}</h3>
                   <button
                     type="button"
@@ -320,6 +322,10 @@ const NotesPage: React.FC = () => {
                   ) : (
                     <p className="text-gray-400 italic">No content</p>
                   )}
+                </div>
+                
+                <div className="mt-6 border-t border-gray-200 pt-4">
+                  <NoteComments noteId={currentNote.id} />
                 </div>
               </div>
             </div>
@@ -339,8 +345,8 @@ const NotesPage: React.FC = () => {
               &#8203;
             </span>
 
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle w-[90vw] max-w-4xl max-h-[90vh] flex flex-col">
+              <div className="bg-white px-6 pt-5 pb-4 sm:p-6 flex-1 overflow-y-auto">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg leading-6 font-medium text-gray-900">
                     {currentNote ? 'Edit Note' : 'Add New Note'}
@@ -369,7 +375,10 @@ const NotesPage: React.FC = () => {
                   </button>
                 </div>
 
-                <form onSubmit={handleSaveNote} className="space-y-4">
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSaveNote();
+                }} className="space-y-4">
                   <div>
                     <label htmlFor="title" className="block text-sm font-medium text-gray-700">
                       Title *
@@ -384,17 +393,18 @@ const NotesPage: React.FC = () => {
                     />
                   </div>
 
-                  <div>
-                    <label htmlFor="content" className="block text-sm font-medium text-gray-700">
+                  <div className="mt-1 flex-1 flex flex-col">
+                    <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-1">
                       Content
                     </label>
-                    <textarea
-                      id="content"
-                      rows={4}
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      value={content}
-                      onChange={e => setContent(e.target.value)}
-                    />
+                    <div className="flex-1 min-h-[200px]">
+                      <textarea
+                        id="content"
+                        className="mt-1 block w-full h-full min-h-[200px] border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-y"
+                        value={content}
+                        onChange={e => setContent(e.target.value)}
+                      />
+                    </div>
                   </div>
 
                   <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">

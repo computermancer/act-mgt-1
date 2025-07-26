@@ -160,16 +160,7 @@ const ActivitiesPage: React.FC = () => {
     setActivityToDelete(null);
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
-  };
+
 
   const formatScheduledDateTime = (activity: Activity) => {
     if (!activity.scheduled_date) return 'Not scheduled';
@@ -401,7 +392,7 @@ const ActivitiesPage: React.FC = () => {
                         </span>
                       )}
                     </h3>
-                    {selectedActivity.distance && (
+                    {selectedActivity.distance !== undefined && selectedActivity.distance > 0 && (
                       <p className="text-sm text-gray-500 mt-1">
                         Distance: {selectedActivity.distance} km
                       </p>
@@ -441,14 +432,6 @@ const ActivitiesPage: React.FC = () => {
                     </div>
                   </div>
                 )}
-                
-                <div className="mt-6 pt-4 border-t border-gray-200">
-                  <p className="text-xs text-gray-400">
-                    Created: {formatDate(selectedActivity.created_at)}
-                    <br />
-                    Last updated: {formatDate(selectedActivity.updated_at)}
-                  </p>
-                </div>
               </div>
             </div>
           </div>

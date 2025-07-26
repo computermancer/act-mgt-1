@@ -19,6 +19,7 @@
     "@types/react-big-calendar": "^1.16.2",
     "@types/react-datepicker": "^6.2.0",
     "@types/react-dom": "^19.1.6",
+    "@vercel/analytics": "^1.5.0",
     "date-fns": "^4.1.0",
     "react": "^19.1.0",
     "react-big-calendar": "^1.19.4",
@@ -31,10 +32,10 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "node start-app.js",
-    "dev": "GENERATE_SOURCEMAP=false react-scripts start",
-    "build": "GENERATE_SOURCEMAP=false react-scripts build",
-    "test": "react-scripts test",
+    "start": "GENERATE_SOURCEMAP=false react-app-rewired start",
+    "dev": "GENERATE_SOURCEMAP=false react-app-rewired start",
+    "build": "GENERATE_SOURCEMAP=false react-app-rewired build",
+    "test": "GENERATE_SOURCEMAP=false react-app-rewired test",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -62,8 +63,10 @@
     "autoprefixer": "^10.4.21",
     "babel-loader": "^10.0.0",
     "css-loader": "^7.1.2",
+    "customize-cra": "^1.0.0",
     "dotenv": "^17.2.0",
     "postcss": "^8.5.6",
+    "react-app-rewired": "^2.2.1",
     "sass-loader": "^16.0.5",
     "style-loader": "^4.0.0",
     "tailwindcss": "^3.4.17",
