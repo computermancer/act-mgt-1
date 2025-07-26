@@ -243,9 +243,6 @@ const NotesPage: React.FC = () => {
               <div className="mt-2 text-sm text-gray-500 line-clamp-3">
                 {note.content}
               </div>
-              <div className="mt-4 text-xs text-gray-400">
-                Last updated: {new Date(note.updated_at).toLocaleDateString()}
-              </div>
             </div>
           </div>
         ))}

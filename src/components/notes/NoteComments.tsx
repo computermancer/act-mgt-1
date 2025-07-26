@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { Comment } from '../../types/note-comments';
-import { getNoteComments, addComment, updateComment, deleteComment, testSupabaseConnection } from '../../services/noteCommentsService';
+import { getNoteComments, addComment, updateComment, deleteComment } from '../../services/noteCommentsService';
 
 interface NoteCommentsProps {
   noteId: string;
@@ -357,22 +357,7 @@ const NoteComments: React.FC<NoteCommentsProps> = ({ noteId }) => {
 
       {/* Comments list */}
       <div className="space-y-4">
-        <div className="flex justify-end">
-          <button
-            onClick={async () => {
-              console.log('Testing Supabase connection...');
-              const isConnected = await testSupabaseConnection();
-              if (isConnected) {
-                alert('Successfully connected to Supabase!');
-              } else {
-                alert('Failed to connect to Supabase. Check console for details.');
-              }
-            }}
-            className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
-          >
-            Test Database Connection
-          </button>
-        </div>
+
         {comments.length === 0 && !isLoading && (
           <p className="text-gray-500 text-center py-4">No comments yet. Be the first to comment!</p>
         )} 
