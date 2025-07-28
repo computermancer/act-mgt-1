@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, FC } from 'react';
 import { format, parseISO, startOfWeek, getDay } from 'date-fns';
 import { enUS } from 'date-fns/locale';
 import { Calendar as BigCalendar, dateFnsLocalizer, Views, Event, View } from 'react-big-calendar';
@@ -9,6 +9,10 @@ import ActivityDetailsModal from '../components/activities/ActivityDetailsModal'
 import { supabase } from '../lib/supabaseClient';
 
 interface CalendarEvent extends Event {
+  title: string;
+  start: Date;
+  end: Date;
+  allDay: boolean;
   activity: Activity;
 }
 
@@ -20,12 +24,12 @@ const parseDate = (dateString: string) => {
 const localizer = dateFnsLocalizer({
   format,
   parse: parseDate,
-  startOfWeek: () => startOfWeek(new Date(), { weekStartsOn: 1 }),
+  startOfWeek: () => startOfWeek(new Date(), { weekStartsOn: 0 }), // 0 = Sunday, 1 = Monday, etc.
   getDay,
   locales: { 'en-US': enUS },
 });
 
-const CalendarPage: React.FC = () => {
+const CalendarPage: FC = () => {
   const [selectedEvent, setSelectedEvent] = useState<Activity | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -64,33 +68,54 @@ const CalendarPage: React.FC = () => {
 
   // Format activities for the calendar
   const events = useMemo<CalendarEvent[]>(() => {
+    console.log('Processing activities:', activities);
     return activities
-      .filter(activity => activity.scheduled_date) // Only include activities with a scheduled date
+      .filter(activity => activity.scheduled_date)
       .map(activity => {
-        // Create a date object from the scheduled_date (format: YYYY-MM-DD)
-        const [year, month, day] = activity.scheduled_date!.split('-').map(Number);
-        const start = new Date(year, month - 1, day); // month is 0-indexed in JavaScript Date
-        
-        // If we have a scheduled_time, set the hours and minutes
-        if (activity.scheduled_time) {
-          const [hours, minutes] = activity.scheduled_time.split(':').map(Number);
-          start.setHours(hours, minutes, 0, 0);
-        } else {
-          // Default to 12:00 PM if no time is specified
+        try {
+          // Parse the date string (format: YYYY-MM-DD)
+          const [year, month, day] = activity.scheduled_date!.split('-').map(Number);
+          
+          // Create a date string in YYYY-MM-DD format and parse it directly
+          const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          let start = new Date(dateStr);
+          
+          // If the date is invalid, fall back to the original method
+          if (isNaN(start.getTime())) {
+            start = new Date(year, month - 1, day);
+          }
+          
+          // Set a default time of noon to avoid timezone issues
           start.setHours(12, 0, 0, 0);
+          
+          // If we have a specific time, use it
+          if (activity.scheduled_time) {
+            const [hours, minutes] = activity.scheduled_time.split(':').map(Number);
+            start.setHours(hours, minutes, 0, 0);
+          }
+          
+          const end = new Date(start);
+          end.setHours(start.getHours() + 1);
+          
+          console.log('Activity:', activity.name, 
+                     'Scheduled Date:', activity.scheduled_date,
+                     'Resulting Date:', start.toISOString().split('T')[0],
+                     'Local Date:', start.toLocaleDateString(),
+                     'Time:', start.toLocaleTimeString());
+          
+          return {
+            title: `${activity.name}${activity.location ? ` - ${activity.location}` : ''}`,
+            start,
+            end,
+            allDay: false,
+            activity,
+          };
+        } catch (error) {
+          console.error('Error processing activity:', activity, error);
+          return null;
         }
-        
-        const end = new Date(start);
-        end.setHours(start.getHours() + 1); // Set end time to 1 hour after start time
-
-        return {
-          title: `${activity.name}${activity.location ? ` - ${activity.location}` : ''}`,
-          start,
-          end,
-          allDay: false,
-          activity,
-        };
-      });
+      })
+      .filter((event): event is CalendarEvent => event !== null);
   }, [activities]);
 
   const handleSelectEvent = (event: CalendarEvent) => {
