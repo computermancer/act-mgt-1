@@ -16,20 +16,50 @@ interface ActivityBase {
   scheduled_time?: string | null;
   created_at: string;
   updated_at: string;
+  is_archived?: boolean;
 }
 
 const ActivitiesPage: React.FC = () => {
+  // State management
+  const [activities, setActivities] = useState<ActivityBase[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedActivity, setSelectedActivity] = useState<ActivityBase | null>(null);
+  const [activityToDelete, setActivityToDelete] = useState<{id: string, name: string} | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const [selectedActivity, setSelectedActivity] = useState<ActivityBase | null>(null);
-  const [activities, setActivities] = useState<ActivityBase[]>([]);
-  const [activityToDelete, setActivityToDelete] = useState<{id: string, name: string} | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isCompleting, setIsCompleting] = useState(false);
   const [lastCompletedActivity, setLastCompletedActivity] = useState<{id: string, name: string} | null>(null);
-
-
-
+  
+  // Format scheduled date and time for display
+  const formatScheduledDateTime = (activity: ActivityBase) => {
+    if (!activity.scheduled_date) return '';
+    
+    const date = new Date(activity.scheduled_date);
+    const options: Intl.DateTimeFormatOptions = { 
+      weekday: 'short', 
+      month: 'short', 
+      day: 'numeric',
+      year: 'numeric'
+    };
+    
+    let formattedDate = date.toLocaleDateString('en-US', options);
+    
+    if (activity.scheduled_time) {
+      const [hours, minutes] = activity.scheduled_time.split(':');
+      const time = new Date();
+      time.setHours(parseInt(hours, 10), parseInt(minutes, 10));
+      
+      const timeOptions: Intl.DateTimeFormatOptions = { 
+        hour: 'numeric', 
+        minute: '2-digit', 
+        hour12: true 
+      };
+      
+      formattedDate += ` at ${time.toLocaleTimeString('en-US', timeOptions)}`;
+    }
+    
+    return formattedDate;
+  };
 
   // Load activities from Supabase
   const loadActivities = async () => {
@@ -104,6 +134,7 @@ const ActivitiesPage: React.FC = () => {
     }
   }, [activities]);
 
+  // Event handlers
   const handleAddActivity = () => {
     setSelectedActivity(null);
     setIsModalOpen(true);
@@ -195,43 +226,23 @@ const ActivitiesPage: React.FC = () => {
     setActivityToDelete({ id: activity.id, name: activity.name });
   };
 
-  const handleActivityCompleted = async (archivedId: string) => {
-    try {
-      // Remove the completed activity from the active list
-      setActivities(prev => prev.filter(activity => activity.id !== selectedActivity?.id));
-      
-      // Set the last completed activity for potential recreation
-      if (selectedActivity) {
-        setLastCompletedActivity({
-          id: selectedActivity.id,
-          name: selectedActivity.name
-        });
-      }
-    } catch (error) {
-      console.error('Error handling activity completion:', error);
-    } finally {
-      setIsCompleting(false);
-      setSelectedActivity(null);
-    }
-  };
-
   const confirmDeleteActivity = async () => {
     if (!activityToDelete) return;
     
     try {
-      // Delete from Supabase
       const { error } = await supabase
         .from('activities')
         .delete()
         .eq('id', activityToDelete.id);
 
       if (error) throw error;
-
-      // Update local state
-      setActivities(prev => prev.filter(activity => activity.id !== activityToDelete.id));
-      setActivityToDelete(null);
+      
+      // Refresh the activities list
+      loadActivities();
     } catch (error) {
       console.error('Error deleting activity:', error);
+    } finally {
+      setActivityToDelete(null);
     }
   };
 
@@ -239,55 +250,45 @@ const ActivitiesPage: React.FC = () => {
     setActivityToDelete(null);
   };
 
-  // Handle closing the activity details modal
   const closeActivityDetails = () => {
     setIsDetailsOpen(false);
     setSelectedActivity(null);
   };
 
-  const formatScheduledDateTime = (activity: ActivityBase): string => {
-    if (!activity.scheduled_date) return 'Not scheduled';
-    
+  // Handle activity completion
+  const handleActivityCompleted = async (archivedId: string) => {
     try {
-      // Parse the date string directly (format: YYYY-MM-DD)
-      const [year, month, day] = activity.scheduled_date.split('-').map(Number);
-      
-      // Create a date object in local timezone
-      const date = new Date(year, month - 1, day);
-      
-      // Format the date parts manually to avoid timezone issues
-      const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      
-      const weekday = weekdays[date.getDay()];
-      const monthName = months[date.getMonth()];
-      
-      let formattedDate = `${weekday}, ${monthName} ${date.getDate()}, ${date.getFullYear()}`;
-      
-      if (activity.scheduled_time) {
-        const [hours, minutes] = activity.scheduled_time.split(':');
-        const hour = parseInt(hours, 10);
-        const minute = parseInt(minutes, 10);
-        
-        // Validate time values
-        if (!isNaN(hour) && !isNaN(minute) && hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
-          const period = hour >= 12 ? 'PM' : 'AM';
-          const displayHour = hour % 12 || 12; // Convert to 12-hour format
-          const displayMinute = minute.toString().padStart(2, '0');
-          
-          formattedDate += ` at ${displayHour}:${displayMinute} ${period}`;
-        }
+      // Find the activity that was completed
+      const completedActivity = activities.find(a => a.id === archivedId);
+      if (completedActivity) {
+        setLastCompletedActivity({
+          id: completedActivity.id,
+          name: completedActivity.name
+        });
       }
       
-      return formattedDate;
+      // Remove the completed activity from the list
+      setActivities(prev => prev.filter(activity => activity.id !== archivedId));
+      
+      // Clear the completed activity after 5 seconds
+      setTimeout(() => {
+        setLastCompletedActivity(null);
+      }, 5000);
+      
     } catch (error) {
-      console.error('Error formatting date:', error);
-      return activity.scheduled_date; // Return the raw date string if formatting fails
+      console.error('Error handling activity completion:', error);
     }
   };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Success message for completed activity */}
+      {lastCompletedActivity && (
+        <div className="mb-4 p-3 bg-green-100 text-green-800 rounded-md">
+          <p>"{lastCompletedActivity.name}" has been completed and archived!</p>
+        </div>
+      )}
+      
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Activities</h1>
         <button
@@ -310,96 +311,96 @@ const ActivitiesPage: React.FC = () => {
       ) : (
         <div className="space-y-4">
           {activities.map((activity) => (
-            <div 
-              key={activity.id} 
-              className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => handleViewActivity(activity)}
-            >
-              <div className="flex justify-between items-start">
-                <div className="w-full space-y-2">
-                  <div className="flex justify-between items-start">
+            <div key={activity.id} className="bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden">
+              <div className="p-4">
+                <div className="flex justify-between items-start">
+                  <div 
+                    className="flex-1 cursor-pointer" 
+                    onClick={() => handleViewActivity(activity)}
+                  >
                     <h3 className="text-lg font-medium text-gray-900">{activity.name}</h3>
                   </div>
+                  <div className="flex space-x-1 ml-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCompleteClick(activity, e);
+                      }}
+                      className="text-green-600 hover:text-green-800 p-1"
+                      title="Mark as completed"
+                    >
+                      <CheckIcon className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditActivity(activity);
+                      }}
+                      className="text-blue-600 hover:text-blue-800 p-1"
+                      title="Edit activity"
+                    >
+                      <PencilIcon className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActivityToDelete({ id: activity.id, name: activity.name });
+                      }}
+                      className="text-red-500 hover:text-red-700 p-1"
+                      title="Delete activity"
+                    >
+                      <TrashIcon className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+                
+                <div 
+                  className="mt-2 space-y-2 text-sm text-gray-600 cursor-pointer"
+                  onClick={() => handleViewActivity(activity)}
+                >
+                  {activity.location && (
+                    <div className="flex items-start">
+                      <span className="font-medium w-20">Location:</span>
+                      <span className="flex-1 bg-gray-50 px-2 py-1 rounded">{activity.location}</span>
+                    </div>
+                  )}
                   
-                  <div className="space-y-2 text-sm text-gray-600">
-                    {/* Location and Distance */}
-                    <div className="space-y-1">
-                      {activity.location && (
-                        <div className="flex items-start">
-                          <span className="font-medium w-20">Location:</span>
-                          <span className="flex-1 bg-gray-50 px-2 py-1 rounded">{activity.location}</span>
-                        </div>
-                      )}
-                      
-                      {/* Scheduled Date/Time */}
-                      {activity.scheduled_date && (
-                        <div className="flex items-start">
-                          <span className="font-medium w-20">When:</span>
-                          <span className="text-blue-600 bg-blue-50 px-2 py-1 rounded">{formatScheduledDateTime(activity)}</span>
-                        </div>
-                      )}
-                      
-                      {(activity.distance !== undefined && activity.distance !== null && activity.distance > 0) && (
-                        <div className="flex items-start">
-                          <span className="font-medium w-20">Distance:</span>
-                          <span className="bg-gray-50 px-2 py-1 rounded">{activity.distance} miles</span>
-                        </div>
-                      )}
+                  {activity.scheduled_date && (
+                    <div className="flex items-start">
+                      <span className="font-medium w-20">When:</span>
+                      <span className="text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                        {formatScheduledDateTime(activity)}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {(activity.distance !== undefined && activity.distance !== null && activity.distance > 0) && (
+                    <div className="flex items-start">
+                      <span className="font-medium w-20">Distance:</span>
+                      <span className="bg-gray-50 px-2 py-1 rounded">{activity.distance} miles</span>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Details Section */}
+                {activity.details && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">Details:</h4>
+                    <div className="text-sm text-gray-700 bg-gray-50 p-3 rounded">
+                      <p className="line-clamp-2">{activity.details}</p>
                     </div>
                   </div>
-                  
-                  {/* Details Section */}
-                  {activity.details && (
-                    <div className="space-y-2 mt-3 pt-2 border-t border-gray-100">
-                      <h4 className="text-sm font-medium text-gray-900">Details:</h4>
-                      <div className="text-sm text-gray-700 bg-gray-50 p-3 rounded">
-                        <p className="line-clamp-2">{activity.details}</p>
-                      </div>
+                )}
+                
+                {/* Notes Section */}
+                {activity.notes && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">Notes:</h4>
+                    <div className="text-sm text-gray-700 bg-gray-50 p-3 rounded">
+                      <p className="line-clamp-2">{activity.notes}</p>
                     </div>
-                  )}
-                  
-                  {/* Notes Section */}
-                  {activity.notes && (
-                    <div className="space-y-2 mt-3 pt-2 border-t border-gray-100">
-                      <h4 className="text-sm font-medium text-gray-900">Notes:</h4>
-                      <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
-                        <p className="line-clamp-2">{activity.notes}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCompleteClick(activity, e);
-                    }}
-                    className="text-green-600 hover:text-green-800"
-                    title="Mark as completed"
-                  >
-                    <CheckIcon className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditActivity(activity);
-                    }}
-                    className="text-blue-600 hover:text-blue-800"
-                    title="Edit activity"
-                  >
-                    <PencilIcon className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActivityToDelete({ id: activity.id, name: activity.name });
-                    }}
-                    className="text-red-500 hover:text-red-700"
-                    title="Delete activity"
-                  >
-                    <TrashIcon className="h-5 w-5" />
-                  </button>
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}
