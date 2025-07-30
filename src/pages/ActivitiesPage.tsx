@@ -44,16 +44,36 @@ const ActivitiesPage: React.FC = () => {
 
       if (activitiesError) throw activitiesError;
       
-      // Sort activities: first by scheduled_date (nulls last), then by created_at (newest first)
+      // Sort activities based on hierarchy:
+      // 1. Scheduled activities (soonest first)
+      // 2. Activities with details (most recently updated first)
+      // 3. Activities with just a title (most recently created first)
       const sortedActivities = [...(activitiesData || [])].sort((a, b) => {
-        // If both have scheduled_date, sort by it (newest first)
+        // Both activities are scheduled - sort by date (soonest first)
         if (a.scheduled_date && b.scheduled_date) {
           return new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime();
         }
-        // If only one has scheduled_date, it comes first
+        
+        // Only A is scheduled
         if (a.scheduled_date) return -1;
+        // Only B is scheduled
         if (b.scheduled_date) return 1;
-        // If neither has scheduled_date, sort by created_at (newest first)
+        
+        // Check if activities have additional information
+        const aHasDetails = a.location || a.distance || a.details || a.notes;
+        const bHasDetails = b.location || b.distance || b.details || b.notes;
+        
+        // Both have details - sort by last updated (newest first)
+        if (aHasDetails && bHasDetails) {
+          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+        }
+        
+        // Only A has details
+        if (aHasDetails) return -1;
+        // Only B has details
+        if (bHasDetails) return 1;
+        
+        // Both are just titles - sort by creation date (newest first)
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
       
@@ -297,19 +317,9 @@ const ActivitiesPage: React.FC = () => {
             >
               <div className="flex justify-between items-start">
                 <div className="w-full space-y-2">
-                  {/* Scheduled Status */}
-                  <div>
-                    {activity.scheduled_date ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                        Scheduled
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                        Not Scheduled
-                      </span>
-                    )}
+                  <div className="flex justify-between items-start">
+                    <h3 className="text-lg font-medium text-gray-900">{activity.name}</h3>
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900">{activity.name}</h3>
                   
                   <div className="space-y-2 text-sm text-gray-600">
                     {/* Location and Distance */}
