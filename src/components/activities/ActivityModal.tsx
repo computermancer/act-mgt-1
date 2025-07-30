@@ -12,7 +12,10 @@ export interface ActivityModalProps {
 }
 
 const ActivityModal: React.FC<ActivityModalProps> = ({ isOpen, onClose, onSave, activity }) => {
-  const [formData, setFormData] = useState<ActivityFormData>({
+  const [formData, setFormData] = useState<Omit<ActivityFormData, 'scheduled_date' | 'scheduled_time'> & {
+    scheduled_date: string | null;
+    scheduled_time: string | null;
+  }>({
     name: '',
     location: '',
     distance: 0,
@@ -61,14 +64,13 @@ const ActivityModal: React.FC<ActivityModalProps> = ({ isOpen, onClose, onSave, 
         return { ...prev, scheduled_date: null };
       }
       
-      // Create a new date in the local timezone to avoid timezone conversion issues
+      // Create a date string in YYYY-MM-DD format from the local date values
+      // This ensures the date is preserved exactly as selected in the UI
       const localDate = new Date(date);
-      localDate.setMinutes(localDate.getMinutes() + localDate.getTimezoneOffset());
-      
-      // Format as YYYY-MM-DD in local time
-      const year = localDate.getFullYear();
-      const month = String(localDate.getMonth() + 1).padStart(2, '0');
-      const day = String(localDate.getDate()).padStart(2, '0');
+      // Use UTC methods to get the date in the local timezone
+      const year = localDate.getUTCFullYear();
+      const month = String(localDate.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(localDate.getUTCDate()).padStart(2, '0');
       const dateString = `${year}-${month}-${day}`;
       
       return {
@@ -76,6 +78,16 @@ const ActivityModal: React.FC<ActivityModalProps> = ({ isOpen, onClose, onSave, 
         scheduled_date: dateString,
       };
     });
+  };
+  
+  // Helper function to create a date object from the stored date string
+  const parseStoredDate = (dateString: string | null): Date | null => {
+    if (!dateString) return null;
+    
+    // Split the date string and create a date object in the local timezone
+    const [year, month, day] = dateString.split('-').map(Number);
+    // Create a date object using local timezone
+    return new Date(year, month - 1, day);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -169,7 +181,7 @@ const ActivityModal: React.FC<ActivityModalProps> = ({ isOpen, onClose, onSave, 
                     Scheduled Date
                   </label>
                   <DatePicker
-                    selected={formData.scheduled_date ? new Date(formData.scheduled_date) : null}
+                    selected={parseStoredDate(formData.scheduled_date)}
                     onChange={handleDateChange}
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     placeholderText="Select date (optional)"
@@ -179,6 +191,7 @@ const ActivityModal: React.FC<ActivityModalProps> = ({ isOpen, onClose, onSave, 
                     showYearDropdown
                     scrollableYearDropdown
                     yearDropdownItemNumber={15}
+                    adjustDateOnChange={false}
                   />
                 </div>
                 <div>

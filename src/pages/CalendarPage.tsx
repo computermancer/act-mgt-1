@@ -52,6 +52,7 @@ const CalendarPage: FC = () => {
         const { data, error } = await supabase
           .from('activities')
           .select('*')
+          .is('is_archived', null)  // Only show non-archived activities
           .order('created_at', { ascending: false });
 
         if (error) throw error;

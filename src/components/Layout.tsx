@@ -47,6 +47,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               >
                 <span className="truncate">Notes</span>
               </Link>
+              <Link
+                to="/archived-activities"
+                className={`flex items-center px-4 py-2 text-sm font-medium rounded-md ${isActive(
+                  '/archived-activities'
+                )}`}
+              >
+                <span className="truncate">Archived Activities</span>
+              </Link>
             </nav>
           </aside>
 

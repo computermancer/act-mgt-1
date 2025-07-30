@@ -33,7 +33,7 @@ const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({ isOpen, onC
                     <div className="text-sm text-gray-900">{activity.location}</div>
                   </div>
                 )}
-                {activity.distance && (
+                {activity.distance !== undefined && activity.distance > 0 && (
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-medium text-gray-500">Distance</div>
                     <div className="text-sm text-gray-900">{activity.distance} miles</div>

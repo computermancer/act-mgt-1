@@ -1,67 +1,108 @@
 import React, { useState, useEffect } from 'react';
-import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
 import ActivityModal from '../components/activities/ActivityModal';
+import CompleteActivityModal from '../components/activities/CompleteActivityModal';
 import { Activity, ActivityFormData } from '../types/activity';
 import { supabase } from '../lib/supabaseClient';
+
+interface ActivityBase {
+  id: string;
+  name: string;
+  location?: string;
+  distance?: number;
+  details?: string;
+  notes?: string;
+  scheduled_date?: string | null;
+  scheduled_time?: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 const ActivitiesPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const [selectedActivity, setSelectedActivity] = useState<ActivityBase | null>(null);
+  const [activities, setActivities] = useState<ActivityBase[]>([]);
   const [activityToDelete, setActivityToDelete] = useState<{id: string, name: string} | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [lastCompletedActivity, setLastCompletedActivity] = useState<{id: string, name: string} | null>(null);
+
+
+
 
   // Load activities from Supabase
+  const loadActivities = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Fetch only non-archived activities
+      const { data: activitiesData, error: activitiesError } = await supabase
+        .from('activities')
+        .select('*')
+        .is('is_archived', null);
+
+      if (activitiesError) throw activitiesError;
+      
+      // Sort activities: first by scheduled_date (nulls last), then by created_at (newest first)
+      const sortedActivities = [...(activitiesData || [])].sort((a, b) => {
+        // If both have scheduled_date, sort by it (newest first)
+        if (a.scheduled_date && b.scheduled_date) {
+          return new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime();
+        }
+        // If only one has scheduled_date, it comes first
+        if (a.scheduled_date) return -1;
+        if (b.scheduled_date) return 1;
+        // If neither has scheduled_date, sort by created_at (newest first)
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+      
+      setActivities(sortedActivities);
+    } catch (error) {
+      console.error('Error loading activities:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadActivities = async () => {
-      try {
-        // First, fetch all activities
-        const { data, error } = await supabase
-          .from('activities')
-          .select('*');
-
-        if (error) throw error;
-        
-        // Sort activities: first by scheduled_date (nulls last), then by created_at (newest first)
-        const sortedActivities = [...(data || [])].sort((a, b) => {
-          // If both have scheduled_date, sort by it (newest first)
-          if (a.scheduled_date && b.scheduled_date) {
-            return new Date(b.scheduled_date).getTime() - new Date(a.scheduled_date).getTime();
-          }
-          // If only one has scheduled_date, it comes first
-          if (a.scheduled_date) return -1;
-          if (b.scheduled_date) return 1;
-          // If neither has scheduled_date, sort by created_at
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        });
-        
-        setActivities(sortedActivities);
-      } catch (error) {
-        console.error('Error loading activities:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     loadActivities();
   }, []);
+
+  useEffect(() => {
+    if (activities.length > 0) {
+      console.log('Activities data:');
+      console.table(activities.map(a => ({
+        name: a.name,
+        distance: a.distance,
+        location: a.location,
+        scheduled_date: a.scheduled_date
+      })));
+      
+      // Also log the first activity's full details
+      console.log('First activity details:', activities[0]);
+    }
+  }, [activities]);
 
   const handleAddActivity = () => {
     setSelectedActivity(null);
     setIsModalOpen(true);
-    setIsDetailsOpen(false);
   };
 
-  const handleViewActivity = (activity: Activity) => {
+  const handleViewActivity = (activity: ActivityBase) => {
     setSelectedActivity(activity);
     setIsDetailsOpen(true);
-    setIsModalOpen(false);
   };
 
-  const handleEditActivity = (activity: Activity) => {
+  const handleEditActivity = (activity: ActivityBase) => {
     setSelectedActivity(activity);
     setIsModalOpen(true);
+  };
+
+  const handleCompleteClick = (activity: ActivityBase, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedActivity(activity);
+    setIsCompleting(true);
   };
 
   const handleSaveActivity = async (activityData: ActivityFormData) => {
@@ -120,8 +161,6 @@ const ActivitiesPage: React.FC = () => {
         if (error) throw error;
         updatedActivity = data;
 
-        if (error) throw error;
-
         // Add to local state
         setActivities([{ ...data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, ...activities]);
       }
@@ -131,9 +170,29 @@ const ActivitiesPage: React.FC = () => {
     }
   };
 
-  const handleDeleteClick = (activity: Activity, e: React.MouseEvent) => {
+  const handleDeleteClick = (activity: ActivityBase, e: React.MouseEvent) => {
     e.stopPropagation();
     setActivityToDelete({ id: activity.id, name: activity.name });
+  };
+
+  const handleActivityCompleted = async (archivedId: string) => {
+    try {
+      // Remove the completed activity from the active list
+      setActivities(prev => prev.filter(activity => activity.id !== selectedActivity?.id));
+      
+      // Set the last completed activity for potential recreation
+      if (selectedActivity) {
+        setLastCompletedActivity({
+          id: selectedActivity.id,
+          name: selectedActivity.name
+        });
+      }
+    } catch (error) {
+      console.error('Error handling activity completion:', error);
+    } finally {
+      setIsCompleting(false);
+      setSelectedActivity(null);
+    }
   };
 
   const confirmDeleteActivity = async () => {
@@ -149,7 +208,7 @@ const ActivitiesPage: React.FC = () => {
       if (error) throw error;
 
       // Update local state
-      setActivities(activities.filter(activity => activity.id !== activityToDelete.id));
+      setActivities(prev => prev.filter(activity => activity.id !== activityToDelete.id));
       setActivityToDelete(null);
     } catch (error) {
       console.error('Error deleting activity:', error);
@@ -160,160 +219,180 @@ const ActivitiesPage: React.FC = () => {
     setActivityToDelete(null);
   };
 
+  // Handle closing the activity details modal
+  const closeActivityDetails = () => {
+    setIsDetailsOpen(false);
+    setSelectedActivity(null);
+  };
 
-
-  const formatScheduledDateTime = (activity: Activity) => {
+  const formatScheduledDateTime = (activity: ActivityBase): string => {
     if (!activity.scheduled_date) return 'Not scheduled';
     
-    const date = new Date(activity.scheduled_date);
-    const formattedDate = date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
-    
-    if (!activity.scheduled_time) return formattedDate;
-    
-    const [hours, minutes] = activity.scheduled_time.split(':');
-    const time = new Date();
-    time.setHours(parseInt(hours, 10), parseInt(minutes, 10));
-    const formattedTime = time.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-    
-    return `${formattedDate} at ${formattedTime}`;
+    try {
+      // Parse the date string directly (format: YYYY-MM-DD)
+      const [year, month, day] = activity.scheduled_date.split('-').map(Number);
+      
+      // Create a date object in local timezone
+      const date = new Date(year, month - 1, day);
+      
+      // Format the date parts manually to avoid timezone issues
+      const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      
+      const weekday = weekdays[date.getDay()];
+      const monthName = months[date.getMonth()];
+      
+      let formattedDate = `${weekday}, ${monthName} ${date.getDate()}, ${date.getFullYear()}`;
+      
+      if (activity.scheduled_time) {
+        const [hours, minutes] = activity.scheduled_time.split(':');
+        const hour = parseInt(hours, 10);
+        const minute = parseInt(minutes, 10);
+        
+        // Validate time values
+        if (!isNaN(hour) && !isNaN(minute) && hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
+          const period = hour >= 12 ? 'PM' : 'AM';
+          const displayHour = hour % 12 || 12; // Convert to 12-hour format
+          const displayMinute = minute.toString().padStart(2, '0');
+          
+          formattedDate += ` at ${displayHour}:${displayMinute} ${period}`;
+        }
+      }
+      
+      return formattedDate;
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return activity.scheduled_date; // Return the raw date string if formatting fails
+    }
   };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="sm:flex sm:items-center">
-        <div className="sm:flex-auto">
-          <h1 className="text-2xl font-semibold text-gray-900">Activities</h1>
-          <p className="mt-2 text-sm text-gray-700">
-            A list of all your activities.
-          </p>
-        </div>
-        <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-          <button
-            type="button"
-            onClick={handleAddActivity}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            disabled={isLoading}
-          >
-            <PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-            {isLoading ? 'Loading...' : 'Add Activity'}
-          </button>
-        </div>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Activities</h1>
+        <button
+          onClick={handleAddActivity}
+          className="flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+        >
+          <PlusIcon className="h-4 w-4 mr-1" />
+          Add Activity
+        </button>
       </div>
 
-      {isLoading && !activities.length ? (
-        <div className="mt-8 flex justify-center">
+      {isLoading ? (
+        <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
         </div>
+      ) : activities.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-gray-500">No activities found. Add your first activity to get started.</p>
+        </div>
       ) : (
-        <div className="mt-8">
-          {activities.length === 0 ? (
-            <div className="text-center py-12 bg-white shadow rounded-lg">
-              <svg
-                className="mx-auto h-12 w-12 text-gray-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1}
-                  d="M13 10V3L4 14h7v7l9-11h-7z"
-                />
-              </svg>
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No activities found</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Get started by creating a new activity.
-              </p>
-            </div>
-          ) : (
-            <div className="max-w-3xl mx-auto space-y-4">
-              {activities.map((activity) => (
-                <div 
-                  key={activity.id} 
-                  className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200 cursor-pointer flex flex-col"
-                  onClick={() => handleViewActivity(activity)}
-                >
-                  <div className="p-5 flex-1 flex flex-col">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="text-lg font-medium text-gray-900">
-                          {activity.name}
-                        </h3>
-                        {activity.location || (activity.distance !== undefined && activity.distance > 0) ? (
-                          <div className="flex items-center mt-1">
-                            {activity.location && (
-                              <span className="text-sm font-normal text-gray-500">
-                                {activity.location}
-                              </span>
-                            )}
-                            {activity.location && activity.distance !== undefined && activity.distance > 0 && (
-                              <span className="mx-2 text-gray-300">•</span>
-                            )}
-                            {activity.distance !== undefined && activity.distance > 0 && (
-                              <span className="text-sm font-normal text-gray-500">
-                                {activity.distance} km
-                              </span>
-                            )}
-                          </div>
-                        ) : null}
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditActivity(activity);
-                          }}
-                          className="text-gray-400 hover:text-blue-500 transition-colors duration-200"
-                        >
-                          <PencilIcon className="h-5 w-5" aria-hidden="true" />
-                          <span className="sr-only">Edit</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => handleDeleteClick(activity, e)}
-                          className="text-gray-400 hover:text-red-500 transition-colors duration-200"
-                        >
-                          <TrashIcon className="h-5 w-5" aria-hidden="true" />
-                          <span className="sr-only">Delete</span>
-                        </button>
-                      </div>
-                    </div>
-                    
-                    {activity.details && (
-                      <div className="mt-2 flex-1 overflow-hidden">
-                        <p className="text-gray-500 text-sm line-clamp-3">
-                          {activity.details}
-                        </p>
-                      </div>
+        <div className="space-y-4">
+          {activities.map((activity) => (
+            <div 
+              key={activity.id} 
+              className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => handleViewActivity(activity)}
+            >
+              <div className="flex justify-between items-start">
+                <div className="w-full space-y-2">
+                  {/* Scheduled Status */}
+                  <div>
+                    {activity.scheduled_date ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                        Scheduled
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                        Not Scheduled
+                      </span>
                     )}
-                    
-                    <div className="mt-3">
-                      <div className="text-xs">
-                        {activity.scheduled_date ? (
-                          <span className="text-blue-600">
-                            Scheduled: {formatScheduledDateTime(activity)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">Not scheduled</span>
-                        )}
-                      </div>
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900">{activity.name}</h3>
+                  
+                  <div className="space-y-2 text-sm text-gray-600">
+                    {/* Location and Distance */}
+                    <div className="space-y-1">
+                      {activity.location && (
+                        <div className="flex items-start">
+                          <span className="font-medium w-20">Location:</span>
+                          <span className="flex-1 bg-gray-50 px-2 py-1 rounded">{activity.location}</span>
+                        </div>
+                      )}
+                      
+                      {/* Scheduled Date/Time */}
+                      {activity.scheduled_date && (
+                        <div className="flex items-start">
+                          <span className="font-medium w-20">When:</span>
+                          <span className="text-blue-600 bg-blue-50 px-2 py-1 rounded">{formatScheduledDateTime(activity)}</span>
+                        </div>
+                      )}
+                      
+                      {(activity.distance !== undefined && activity.distance !== null && activity.distance > 0) && (
+                        <div className="flex items-start">
+                          <span className="font-medium w-20">Distance:</span>
+                          <span className="bg-gray-50 px-2 py-1 rounded">{activity.distance} miles</span>
+                        </div>
+                      )}
                     </div>
                   </div>
+                  
+                  {/* Details Section */}
+                  {activity.details && (
+                    <div className="space-y-2 mt-3 pt-2 border-t border-gray-100">
+                      <h4 className="text-sm font-medium text-gray-900">Details:</h4>
+                      <div className="text-sm text-gray-700 bg-gray-50 p-3 rounded">
+                        <p className="line-clamp-2">{activity.details}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Notes Section */}
+                  {activity.notes && (
+                    <div className="space-y-2 mt-3 pt-2 border-t border-gray-100">
+                      <h4 className="text-sm font-medium text-gray-900">Notes:</h4>
+                      <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
+                        <p className="line-clamp-2">{activity.notes}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ))}
+                <div className="flex space-x-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCompleteClick(activity, e);
+                    }}
+                    className="text-green-600 hover:text-green-800"
+                    title="Mark as completed"
+                  >
+                    <CheckIcon className="h-5 w-5" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEditActivity(activity);
+                    }}
+                    className="text-blue-600 hover:text-blue-800"
+                    title="Edit activity"
+                  >
+                    <PencilIcon className="h-5 w-5" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActivityToDelete({ id: activity.id, name: activity.name });
+                    }}
+                    className="text-red-500 hover:text-red-700"
+                    title="Delete activity"
+                  >
+                    <TrashIcon className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
             </div>
-          )}
+          ))}
         </div>
       )}
 
@@ -439,15 +518,30 @@ const ActivitiesPage: React.FC = () => {
       )}
 
       {/* Activity Editor Modal */}
-      <ActivityModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setSelectedActivity(null);
-        }}
-        onSave={handleSaveActivity}
-        activity={selectedActivity}
-      />
+      {isModalOpen && (
+        <ActivityModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedActivity(null);
+          }}
+          onSave={handleSaveActivity}
+          activity={selectedActivity}
+        />
+      )}
+
+      {selectedActivity && isCompleting && (
+        <CompleteActivityModal
+          isOpen={isCompleting}
+          onClose={() => {
+            setIsCompleting(false);
+            setSelectedActivity(null);
+          }}
+          activityId={selectedActivity.id}
+          activityName={selectedActivity.name}
+          onActivityCompleted={handleActivityCompleted}
+        />
+      )}
     </div>
   );
 };

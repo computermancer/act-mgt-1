@@ -69,8 +69,12 @@ const ActivityList: React.FC<ActivityListProps> = ({
                 </div>
                 <div className="mt-2 flex flex-col sm:flex-row sm:flex-wrap sm:mt-0 sm:space-x-6">
                   <div className="flex items-center text-sm text-gray-500">
-                    <ClockIcon className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" aria-hidden="true" />
-                    {activity.distance} mi
+                    {activity.distance !== undefined && activity.distance > 0 && (
+                    <>
+                      <ClockIcon className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" aria-hidden="true" />
+                      {activity.distance} mi
+                    </>
+                  )}
                   </div>
                   <div className="flex items-center text-sm text-gray-500">
                     <MapPinIcon className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" aria-hidden="true" />
